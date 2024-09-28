@@ -21,3 +21,7 @@ func TestNewTask(t *testing.T) {
 	// 	t.Errorf("task name should be 'false', but got %t", task.Completed)
 	// }
 }
+
+func TestNewOptions(t *testing.T) {
+	// newOptions()
+}

@@ -6,16 +6,17 @@ import (
 	"log"
 	"os"
 	"slices"
-	"sort"
 	"strconv"
 	"time"
 )
 
 type Options struct {
 	path            string
-	backup          bool
-	backup_path     string
 	listAfterChange bool
+	numbered_list   bool
+	// storingFormat   ENUM // json, markdown
+	// backup          bool
+	// backup_path     string
 }
 
 type Task struct {
@@ -39,6 +40,20 @@ func (t TODO) Less(i, j int) bool {
 	return t[i].ID < t[j].ID
 }
 
+func newOptions(opts ...func(o *Options)) *Options {
+	options := Options{
+		path:            "todos.json",
+		listAfterChange: true,
+		numbered_list:   true,
+	}
+
+	for _, fn := range opts {
+		fn(&options)
+	}
+
+	return &options
+}
+
 func NewTask(id int, name string) *Task {
 	t := time.Now()
 	return &Task{
@@ -49,53 +64,55 @@ func NewTask(id int, name string) *Task {
 	}
 }
 
-func (t *Task) Len() int {
-	return len(t.Name)
-}
-
-var todosFilename = "todos.json"
-
 func main() {
-
-	tasks := ReadTasksFromDisk()
+	options := newOptions()
+	tasks := readTasksFromDisk(options.path)
 
 	if len(os.Args) < 2 {
-		List(tasks)
+		list(tasks)
 		os.Exit(0)
 	}
 
 	switch os.Args[1] {
 	case "add", "a":
 		checkIsEnoughArgs(3)
-		tasks = Add(tasks, os.Args[2:]...)
+		tasks = add(tasks, os.Args[2:]...)
 	case "edit", "e":
 		checkIsEnoughArgs(3)
-		taskID := GetTaskIdFromArg(os.Args[2])
-		tasks = Edit(tasks, taskID, os.Args[3])
+		taskID := getTaskIdFromArg(os.Args[2])
+		tasks = edit(tasks, taskID, os.Args[3])
 	case "done", "d":
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
-			taskId := GetTaskIdFromArg(arg)
-			tasks = SetCompleted(tasks, true, taskId)
+			taskId := getTaskIdFromArg(arg)
+			tasks = setCompleted(tasks, true, taskId)
 		}
 	case "undone", "u":
+		checkIsEnoughArgs(3)
+		for _, arg := range os.Args[2:] {
+			taskId := getTaskIdFromArg(arg)
+			tasks = setCompleted(tasks, false, taskId)
+		}
 	case "info", "i":
 		checkIsEnoughArgs(3)
-		taskId := GetTaskIdFromArg(os.Args[2])
+		taskId := getTaskIdFromArg(os.Args[2])
 		Info(tasks, taskId)
 	case "list", "l":
-		List(tasks)
+		list(tasks)
+		os.Exit(0)
 	case "reset", "rs":
-		AskForConfirmation()
 		tasks = TODO{}
 	case "remove", "rm":
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
-			taskId := GetTaskIdFromArg(arg)
-			tasks = Remove(tasks, taskId)
+			taskId := getTaskIdFromArg(arg)
+			tasks = remove(tasks, taskId)
 		}
 	}
-	WriteTasksToDisk(tasks)
+	if options.listAfterChange {
+		list(tasks)
+	}
+	writeTasksToDisk(tasks, options.path)
 	os.Exit(0)
 }
 
@@ -105,28 +122,22 @@ func checkIsEnoughArgs(need int) {
 	}
 }
 
-func AskForConfirmation() {
-	os.Exit(0)
-	// TODO
-}
-
-func GetTaskIdFromArg(arg string) int {
+func getTaskIdFromArg(arg string) int {
 	taskID, err := strconv.Atoi(arg)
 	if err != nil {
-		log.Fatal("Couldn't read taskID.ID must be number")
+		log.Fatal("Couldn't read task ID from arg. ID must be number")
 	}
 	return taskID
 }
 
-func ReadTasksFromDisk() TODO {
-	file, err := os.Open(todosFilename)
+func readTasksFromDisk(path string) TODO {
+	file, err := os.Open(path)
 	if err != nil {
 		return TODO{}
 	}
 	decoder := json.NewDecoder(file)
 
 	var tasks TODO
-
 	err = decoder.Decode(&tasks)
 	if err != nil {
 		log.Fatal(err)
@@ -134,7 +145,7 @@ func ReadTasksFromDisk() TODO {
 	return tasks
 }
 
-func List(tasks TODO) {
+func list(tasks TODO) {
 	for _, task := range tasks {
 		if task.Completed {
 			fmt.Printf("%d \x1b[9m%s\x1b[0m\n", task.ID, task.Name)
@@ -144,9 +155,9 @@ func List(tasks TODO) {
 	}
 }
 
-func SetCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
+func setCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 	for _, id := range taskIDs {
-		task, _ := GetTaskByID(tasks, id)
+		task, _ := getTaskByID(tasks, id)
 		if task != nil {
 			task.Completed = completed
 		}
@@ -154,51 +165,49 @@ func SetCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 	return tasks
 }
 
-func Add(tasks TODO, tasksToAdd ...string) TODO {
+func add(tasks TODO, tasksToAdd ...string) TODO {
 	for i, task := range tasksToAdd {
-		tasks = append(tasks, NewTask(i+len(tasks)+1, task))
+		tasks = append(tasks, NewTask(i+1+len(tasks), task))
 	}
 	return tasks
 }
 
-func Edit(tasks TODO, taskID int, newName string) TODO {
-	for _, task := range tasks {
-		if task.ID == taskID {
-			task.Name = newName
-		}
-	}
+func edit(tasks TODO, id int, newName string) TODO {
+	task, _ := getTaskByID(tasks, id)
+	task.Name = newName
 	return tasks
 }
 
-func Remove(tasks TODO, idsToRemove ...int) TODO {
+func remove(tasks TODO, idsToRemove ...int) TODO {
 	for _, id := range idsToRemove {
-		task, index := GetTaskByID(tasks, id)
-		if task.ID == id {
-			fmt.Println("removing " + task.Name)
-			tasks = slices.Delete(tasks, index, index)
+		task, index := getTaskByID(tasks, id)
+		if task != nil {
+			tasks = slices.Delete(tasks, index, index+1)
 		}
 	}
 	return tasks
 }
 
 func Info(tasks TODO, taskID int) {
-	if t, _ := GetTaskByID(tasks, taskID); t != nil {
+	if t, _ := getTaskByID(tasks, taskID); t != nil {
 		fmt.Printf("ID: %d\nname: %s\ncompleted: %t\ndate: %s\n", t.ID, t.Name, t.Completed, t.Date)
 	}
 }
 
-func GetTaskByID(tasks TODO, id int) (*Task, int) {
+func getTaskByID(tasks TODO, id int) (*Task, int) {
 	index, exists := slices.BinarySearchFunc(tasks, id, func(t *Task, i int) int {
 		return t.ID - i
 	})
 	if exists {
 		return tasks[index], index
+	} else {
+		fmt.Println("no task found with id: ", id)
 	}
 	return nil, -1
 }
 
-func WriteTasksToDisk(tasks TODO) {
-	file, err := os.Create(todosFilename)
+func writeTasksToDisk(tasks TODO, path string) {
+	file, err := os.Create(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -207,8 +216,4 @@ func WriteTasksToDisk(tasks TODO) {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func Sort(tasks TODO) {
-	sort.Sort(tasks)
 }
