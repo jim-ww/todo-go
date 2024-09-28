@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -44,7 +45,6 @@ func newOptions(opts ...func(o *Options)) *Options {
 	options := Options{
 		path:            "todos.json",
 		listAfterChange: true,
-		numbered_list:   true,
 	}
 
 	for _, fn := range opts {
@@ -66,21 +66,23 @@ func NewTask(id int, name string) *Task {
 
 func main() {
 	options := newOptions()
-	tasks := readTasksFromDisk(options.path)
+	tasks, _ := readTasksFromFile(options.path)
 
 	if len(os.Args) < 2 {
-		list(tasks)
+		printTasks(tasks)
 		os.Exit(0)
 	}
 
 	switch os.Args[1] {
 	case "add", "a":
 		checkIsEnoughArgs(3)
-		tasks = add(tasks, os.Args[2:]...)
+		tasks = addNewTasks(tasks, os.Args[2:]...)
 	case "edit", "e":
 		checkIsEnoughArgs(3)
 		taskID := getTaskIdFromArg(os.Args[2])
-		tasks = edit(tasks, taskID, os.Args[3])
+		tasks = updateTaskByID(tasks, taskID, func(t *Task) {
+			t.Name = os.Args[3]
+		})
 	case "done", "d":
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
@@ -95,10 +97,10 @@ func main() {
 		}
 	case "info", "i":
 		checkIsEnoughArgs(3)
-		taskId := getTaskIdFromArg(os.Args[2])
-		Info(tasks, taskId)
+		id := getTaskIdFromArg(os.Args[2])
+		printTaskInfoByID(tasks, id)
 	case "list", "l":
-		list(tasks)
+		printTasks(tasks)
 		os.Exit(0)
 	case "reset", "rs":
 		tasks = TODO{}
@@ -106,13 +108,13 @@ func main() {
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
 			taskId := getTaskIdFromArg(arg)
-			tasks = remove(tasks, taskId)
+			tasks = deleteTaskByIDs(tasks, taskId)
 		}
 	}
 	if options.listAfterChange {
-		list(tasks)
+		printTasks(tasks)
 	}
-	writeTasksToDisk(tasks, options.path)
+	writeTasksToFile(tasks, options.path)
 	os.Exit(0)
 }
 
@@ -130,34 +132,26 @@ func getTaskIdFromArg(arg string) int {
 	return taskID
 }
 
-func readTasksFromDisk(path string) TODO {
-	file, err := os.Open(path)
-	if err != nil {
-		return TODO{}
+func printTasks(tasks TODO) {
+	for _, task := range tasks {
+		printTask(task)
 	}
-	decoder := json.NewDecoder(file)
-
-	var tasks TODO
-	err = decoder.Decode(&tasks)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return tasks
 }
 
-func list(tasks TODO) {
-	for _, task := range tasks {
-		if task.Completed {
-			fmt.Printf("%d \x1b[9m%s\x1b[0m\n", task.ID, task.Name)
-		} else {
-			fmt.Printf("%d %s \n", task.ID, task.Name)
-		}
+func printTask(task *Task) {
+	if !task.Completed {
+		fmt.Printf("%d %s\n", task.ID, task.Name)
+		return
 	}
+
+	strikeStart := "\x1b[9m"
+	strikeEnd := "\x1b[0m"
+	fmt.Printf("%d %s %s %s\n", task.ID, strikeStart, task.Name, strikeEnd)
 }
 
 func setCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 	for _, id := range taskIDs {
-		task, _ := getTaskByID(tasks, id)
+		_, task := getTaskByID(tasks, id)
 		if task != nil {
 			task.Completed = completed
 		}
@@ -165,55 +159,67 @@ func setCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 	return tasks
 }
 
-func add(tasks TODO, tasksToAdd ...string) TODO {
+func addNewTasks(tasks TODO, tasksToAdd ...string) TODO {
 	for i, task := range tasksToAdd {
 		tasks = append(tasks, NewTask(i+1+len(tasks), task))
 	}
 	return tasks
 }
 
-func edit(tasks TODO, id int, newName string) TODO {
-	task, _ := getTaskByID(tasks, id)
-	task.Name = newName
+func updateTaskByID(tasks TODO, id int, update func(t *Task)) TODO {
+	_, task := getTaskByID(tasks, id)
+	update(task)
 	return tasks
 }
 
-func remove(tasks TODO, idsToRemove ...int) TODO {
-	for _, id := range idsToRemove {
-		task, index := getTaskByID(tasks, id)
+func deleteTaskByIDs(tasks TODO, IDs ...int) TODO {
+	for _, id := range IDs {
+		i, task := getTaskByID(tasks, id)
 		if task != nil {
-			tasks = slices.Delete(tasks, index, index+1)
+			tasks = slices.Delete(tasks, i, i+1)
 		}
 	}
 	return tasks
 }
 
-func Info(tasks TODO, taskID int) {
-	if t, _ := getTaskByID(tasks, taskID); t != nil {
+func printTaskInfoByID(tasks TODO, id int) {
+	if _, t := getTaskByID(tasks, id); t != nil {
 		fmt.Printf("ID: %d\nname: %s\ncompleted: %t\ndate: %s\n", t.ID, t.Name, t.Completed, t.Date)
 	}
 }
 
-func getTaskByID(tasks TODO, id int) (*Task, int) {
+func getTaskByID(tasks TODO, id int) (int, *Task) {
 	index, exists := slices.BinarySearchFunc(tasks, id, func(t *Task, i int) int {
 		return t.ID - i
 	})
 	if exists {
-		return tasks[index], index
-	} else {
-		fmt.Println("no task found with id: ", id)
+		return index, tasks[index]
 	}
-	return nil, -1
+	return -1, nil
 }
 
-func writeTasksToDisk(tasks TODO, path string) {
-	file, err := os.Create(path)
+func readTasksFromFile(path string) (TODO, error) {
+	file, err := os.Open(path)
 	if err != nil {
-		log.Fatal(err)
+		return TODO{}, errors.Join(errors.New("couldn't open provided path: "+path), err)
 	}
 
-	err = json.NewEncoder(file).Encode(tasks)
+	decoder := json.NewDecoder(file)
+	var tasks TODO
+	err = decoder.Decode(&tasks)
 	if err != nil {
-		log.Fatal(err)
+		return TODO{}, errors.New("couldn't decode json tasks from " + path)
 	}
+	return tasks, nil
+}
+
+func writeTasksToFile(tasks TODO, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return errors.Join(errors.New("couldn't create tasks file at "+path), err)
+	}
+	if err := json.NewEncoder(file).Encode(tasks); err != nil {
+		return errors.Join(errors.New("couldn't encode json tasks to "+path), err)
+	}
+	return nil
 }
