@@ -11,6 +11,13 @@ import (
 	"time"
 )
 
+type Options struct {
+	path            string
+	backup          bool
+	backup_path     string
+	listAfterChange bool
+}
+
 type Task struct {
 	ID        int
 	Name      string
@@ -46,13 +53,11 @@ func (t *Task) Len() int {
 	return len(t.Name)
 }
 
-var tasks []*Task
-
 var todosFilename = "todos.json"
 
 func main() {
 
-	tasks = ReadTasksFromDisk()
+	tasks := ReadTasksFromDisk()
 
 	if len(os.Args) < 2 {
 		List(tasks)
@@ -71,8 +76,9 @@ func main() {
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
 			taskId := GetTaskIdFromArg(arg)
-			tasks = Done(tasks, taskId)
+			tasks = SetCompleted(tasks, true, taskId)
 		}
+	case "undone", "u":
 	case "info", "i":
 		checkIsEnoughArgs(3)
 		taskId := GetTaskIdFromArg(os.Args[2])
@@ -80,7 +86,8 @@ func main() {
 	case "list", "l":
 		List(tasks)
 	case "reset", "rs":
-		WriteTasksToDisk([]*Task{})
+		AskForConfirmation()
+		tasks = TODO{}
 	case "remove", "rm":
 		checkIsEnoughArgs(3)
 		for _, arg := range os.Args[2:] {
@@ -98,6 +105,11 @@ func checkIsEnoughArgs(need int) {
 	}
 }
 
+func AskForConfirmation() {
+	os.Exit(0)
+	// TODO
+}
+
 func GetTaskIdFromArg(arg string) int {
 	taskID, err := strconv.Atoi(arg)
 	if err != nil {
@@ -106,14 +118,14 @@ func GetTaskIdFromArg(arg string) int {
 	return taskID
 }
 
-func ReadTasksFromDisk() []*Task {
+func ReadTasksFromDisk() TODO {
 	file, err := os.Open(todosFilename)
 	if err != nil {
-		return []*Task{}
+		return TODO{}
 	}
 	decoder := json.NewDecoder(file)
 
-	var tasks []*Task
+	var tasks TODO
 
 	err = decoder.Decode(&tasks)
 	if err != nil {
@@ -122,7 +134,7 @@ func ReadTasksFromDisk() []*Task {
 	return tasks
 }
 
-func List(tasks []*Task) {
+func List(tasks TODO) {
 	for _, task := range tasks {
 		if task.Completed {
 			fmt.Printf("%d \x1b[9m%s\x1b[0m\n", task.ID, task.Name)
@@ -132,25 +144,24 @@ func List(tasks []*Task) {
 	}
 }
 
-func Done(tasks []*Task, taskIDs ...int) []*Task {
-	for _, task := range tasks {
-		for _, id := range taskIDs {
-			if task.ID == id {
-				task.Completed = true
-			}
+func SetCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
+	for _, id := range taskIDs {
+		task, _ := GetTaskByID(tasks, id)
+		if task != nil {
+			task.Completed = completed
 		}
 	}
 	return tasks
 }
 
-func Add(tasks []*Task, tasksToAdd ...string) []*Task {
+func Add(tasks TODO, tasksToAdd ...string) TODO {
 	for i, task := range tasksToAdd {
 		tasks = append(tasks, NewTask(i+len(tasks)+1, task))
 	}
 	return tasks
 }
 
-func Edit(tasks []*Task, taskID int, newName string) []*Task {
+func Edit(tasks TODO, taskID int, newName string) TODO {
 	for _, task := range tasks {
 		if task.ID == taskID {
 			task.Name = newName
@@ -159,32 +170,34 @@ func Edit(tasks []*Task, taskID int, newName string) []*Task {
 	return tasks
 }
 
-func Remove(tasks []*Task, taskIds ...int) []*Task {
-	for i, task := range tasks {
-		for _, idToRemove := range taskIds {
-			if task.ID == idToRemove {
-				fmt.Println("removing " + task.Name)
-				tasks = slices.Delete(tasks, i, i)
-			}
+func Remove(tasks TODO, idsToRemove ...int) TODO {
+	for _, id := range idsToRemove {
+		task, index := GetTaskByID(tasks, id)
+		if task.ID == id {
+			fmt.Println("removing " + task.Name)
+			tasks = slices.Delete(tasks, index, index)
 		}
 	}
 	return tasks
 }
 
-func Info(tasks []*Task, taskID int) {
-	for _, task := range tasks {
-		if task.ID == taskID {
-			// TODO
-			// result := slices.BinarySearch(tasks, func(task *Task) bool {
-			// return task.ID == taskID
-			// })
-			fmt.Printf("ID: %d\nname: %s\ncompleted: %t\ndate: %s\n", task.ID, task.Name, task.Completed, task.Date)
-			return
-		}
+func Info(tasks TODO, taskID int) {
+	if t, _ := GetTaskByID(tasks, taskID); t != nil {
+		fmt.Printf("ID: %d\nname: %s\ncompleted: %t\ndate: %s\n", t.ID, t.Name, t.Completed, t.Date)
 	}
 }
 
-func WriteTasksToDisk(tasks []*Task) {
+func GetTaskByID(tasks TODO, id int) (*Task, int) {
+	index, exists := slices.BinarySearchFunc(tasks, id, func(t *Task, i int) int {
+		return t.ID - i
+	})
+	if exists {
+		return tasks[index], index
+	}
+	return nil, -1
+}
+
+func WriteTasksToDisk(tasks TODO) {
 	file, err := os.Create(todosFilename)
 	if err != nil {
 		log.Fatal(err)
