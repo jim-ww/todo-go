@@ -15,7 +15,6 @@ import (
 type Options struct {
 	path            string
 	listAfterChange bool
-	numbered_list   bool
 	// storingFormat   ENUM // json, markdown
 	// backup          bool
 	// backup_path     string
