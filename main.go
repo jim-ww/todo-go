@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"time"
@@ -42,15 +43,16 @@ func (t TODO) Less(i, j int) bool {
 }
 
 func newOptions(opts ...func(o *Options)) *Options {
+
+	todoData := filepath.Join(os.Getenv("HOME"), ".local", "share", "todos.json")
+
 	options := Options{
-		path:            "todos.json",
+		path:            todoData,
 		listAfterChange: true,
 	}
-
 	for _, fn := range opts {
 		fn(&options)
 	}
-
 	return &options
 }
 
@@ -63,6 +65,39 @@ func NewTask(id int, name string) *Task {
 		Completed: false,
 	}
 }
+
+var helpInfo = `Usage: todo [COMMAND] [ARGUMENTS]
+Todo-go is a fast and simple tasks organizer written in go
+Example: todo list
+Available commands:
+    - add [TASK/s]
+        adds new task/s
+        Examples:
+				todo add \"buy carrots\" "buy milk"
+				todo add carrots milk bread
+    - edit [INDEX] [EDITED TASK]
+        edits an existing task/s
+        Example: todo edit 1 banana
+    - list
+        lists all tasks
+        Example: todo list
+    - done [INDEX]
+        marks task as done
+        Example: todo done 2 3 (marks second and third tasks as completed)
+    - rm [INDEX]
+        removes a task
+        Example: todo rm 4
+    - reset
+        deletes all tasks
+    - restore
+        restore recent backup after reset
+    - sort
+        sorts completed and uncompleted tasks
+        Example: todo sort
+    - raw [todo/done]
+        prints nothing but done/incompleted tasks in plain text, useful for scripting
+        Example: todo raw done
+`
 
 func main() {
 	options := newOptions()
@@ -110,12 +145,20 @@ func main() {
 			taskId := getTaskIdFromArg(arg)
 			tasks = deleteTaskByIDs(tasks, taskId)
 		}
+	default:
+		printHelp()
+		os.Exit(0)
 	}
+
 	if options.listAfterChange {
 		printTasks(tasks)
 	}
 	writeTasksToFile(tasks, options.path)
 	os.Exit(0)
+}
+
+func printHelp() {
+	fmt.Println(helpInfo)
 }
 
 func checkIsEnoughArgs(need int) {
@@ -160,8 +203,9 @@ func setCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 }
 
 func addNewTasks(tasks TODO, tasksToAdd ...string) TODO {
+	startID := len(tasks) + 1
 	for i, task := range tasksToAdd {
-		tasks = append(tasks, NewTask(i+1+len(tasks), task))
+		tasks = append(tasks, NewTask(startID+i, task))
 	}
 	return tasks
 }
