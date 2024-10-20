@@ -202,7 +202,7 @@ func setCompleted(tasks TODO, completed bool, taskIDs ...int) TODO {
 }
 
 func addNewTasks(tasks TODO, tasksToAdd ...string) TODO {
-	startID := len(tasks) + 1
+	startID := tasks[tasks.Len()-1].ID + 1
 	for i, task := range tasksToAdd {
 		tasks = append(tasks, NewTask(startID+i, task))
 	}
