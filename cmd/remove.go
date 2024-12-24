@@ -8,7 +8,7 @@ import (
 var removeCmd = &cobra.Command{
 	Use:     "remove id...",
 	Short:   "Removes task/s by id",
-	Aliases: []string{"rm"},
+	Aliases: []string{"r", "rm"},
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		for i, arg := range args {
