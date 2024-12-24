@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/jim-ww/todo-go/task"
 	"github.com/spf13/cobra"
@@ -19,6 +22,19 @@ var rootCmd = &cobra.Command{
 	Use:   "todo",
 	Short: "Todo-go is a fast and simple tasks organizer written in Go",
 	Run:   listCmd.Run,
+}
+
+func extractAndCheckArgID(arg string, lenOffcet int) int {
+	id, err := strconv.Atoi(arg)
+	if err != nil {
+		log.Fatalf("invalid 'id' argument, must be number(int)")
+	}
+	id -= lenOffcet
+	if id > len(task.Tasks) || id < 1 {
+		fmt.Println("task id must be in range of list")
+		os.Exit(1)
+	}
+	return id
 }
 
 func writeChanges() {

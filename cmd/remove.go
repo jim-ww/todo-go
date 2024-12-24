@@ -1,11 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"strconv"
-
 	"github.com/jim-ww/todo-go/task"
 	"github.com/spf13/cobra"
 )
@@ -17,15 +12,7 @@ var removeCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		for i, arg := range args {
-			id, err := strconv.Atoi(arg)
-			if err != nil {
-				log.Fatalf("invalid 'id' argument, must be number(int)")
-			}
-			id -= i
-			if id > len(task.Tasks) || id < 1 {
-				fmt.Println("task id must be in range of list")
-				os.Exit(1)
-			}
+			id := extractAndCheckArgID(arg, i)
 			task.Tasks = append(task.Tasks[:id-1], task.Tasks[id:]...)
 		}
 		writeChanges()
