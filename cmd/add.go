@@ -7,7 +7,7 @@ import (
 
 var addCmd = &cobra.Command{
 	Use:     "add task...",
-	Short:   "Add new tasks",
+	Short:   "Adds new task/s",
 	Example: "todo add 'buy milk' 'sign petition'\ntodo add task1 task2 task3",
 	Args:    cobra.MinimumNArgs(1),
 	Aliases: []string{"a"},
@@ -15,10 +15,7 @@ var addCmd = &cobra.Command{
 		for _, arg := range args {
 			task.Tasks = append(task.Tasks, task.NewTask(arg))
 		}
-		if listAfter, _ := cmd.Flags().GetBool("list-after"); listAfter {
-			task.PrintTasks()
-		}
-		task.WriteTasksCSV(cfg.todosFilepath)
+		writeChanges()
 	},
 }
 

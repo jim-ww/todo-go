@@ -2,7 +2,6 @@ package task
 
 import (
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -48,30 +47,6 @@ func (t *Task) CSV() []string {
 	return []string{t.Name, strconv.FormatBool(t.Completed), strconv.FormatInt(t.Time.Unix(), 10)}
 }
 
-func ReadTasksJSON(filepath string) error {
-	file, err := os.Open(filepath)
-	if err != nil {
-		return fmt.Errorf("couldn't open path: %s: %w", filepath, err)
-	}
-	defer file.Close()
-	if err = json.NewDecoder(file).Decode(&Tasks); err != nil {
-		return fmt.Errorf("couldn't decode json tasks, %w", err)
-	}
-	return nil
-}
-
-func WriteTasksJSON(filepath string) error {
-	file, err := os.Create(filepath)
-	if err != nil {
-		return fmt.Errorf("couldn't create tasks file at %s: %w", filepath, err)
-	}
-	defer file.Close()
-	if err := json.NewEncoder(file).Encode(Tasks); err != nil {
-		return fmt.Errorf("couldn't encode json tasks to %s: %w", filepath, err)
-	}
-	return nil
-}
-
 func ReadTasksCSV(filepath string) (tasks []*Task) {
 	file, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
@@ -95,7 +70,7 @@ func ReadTasksCSV(filepath string) (tasks []*Task) {
 }
 
 func WriteTasksCSV(filepath string) {
-	file, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0644)
+	file, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Fatalf("couldn't open path for writing: %s: %v", filepath, err)
 	}
@@ -103,9 +78,10 @@ func WriteTasksCSV(filepath string) {
 
 	w := csv.NewWriter(file)
 	defer w.Flush()
-
-	if err := w.Write([]string{"name", "completed", "date"}); err != nil {
-		log.Fatalf("failed to write header: %v", err)
+	if info, _ := file.Stat(); info.Size() == 0 {
+		if err := w.Write([]string{"name", "completed", "date"}); err != nil {
+			log.Fatalf("failed to write header: %v", err)
+		}
 	}
 	for _, task := range Tasks {
 		if err = w.Write(task.CSV()); err != nil {

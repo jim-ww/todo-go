@@ -21,6 +21,13 @@ var rootCmd = &cobra.Command{
 	Run:   listCmd.Run,
 }
 
+func writeChanges() {
+	task.WriteTasksCSV(cfg.todosFilepath)
+	if cfg.listAfter {
+		task.PrintTasks()
+	}
+}
+
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -29,7 +36,10 @@ func Execute() {
 }
 
 func init() {
-	cfg.todosFilepath = *rootCmd.Flags().String("path", filepath.Join(os.Getenv("HOME"), ".local", "share", "todos.csv"), "path to todos file") // TODO make platform independent?
-	rootCmd.PersistentFlags().BoolP("list-after", "l", true, "List tasks after adding/removing one")
+	cfg.todosFilepath = *rootCmd.PersistentFlags().StringP("path", "p", filepath.Join(os.Getenv("HOME"), ".local", "share", "todos.csv"), "path to todos file") // TODO make platform independent?
+	cfg.listAfter = *rootCmd.PersistentFlags().BoolP("list-after", "l", true, "List tasks after adding/removing one")
+	// TODO
+	//cfg.listAfter, _ = cmd.Flags().GetBool("list-after")
+	//cfg.todosFilepath, _ = cmd.Flags().GetString("path")
 	task.Tasks = task.ReadTasksCSV(cfg.todosFilepath)
 }
