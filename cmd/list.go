@@ -16,5 +16,6 @@ var listCmd = &cobra.Command{
 }
 
 func init() {
+	// TODO add flag to print time
 	rootCmd.AddCommand(listCmd)
 }
