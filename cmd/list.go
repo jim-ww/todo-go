@@ -9,6 +9,7 @@ var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "Lists all tasks",
 	Aliases: []string{"l"},
+	Example: "todo list",
 	Run: func(cmd *cobra.Command, args []string) {
 		task.PrintTasks()
 	},

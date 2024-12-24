@@ -8,6 +8,7 @@ import (
 var removeCmd = &cobra.Command{
 	Use:     "remove id...",
 	Short:   "Removes task/s by id",
+	Example: "todo remove 1 2 3\ntodo r 4",
 	Aliases: []string{"r", "rm"},
 	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

@@ -8,6 +8,7 @@ import (
 var doneCmd = &cobra.Command{
 	Use:     "done task...",
 	Short:   "Marks task/s with selected id's as 'done'",
+	Example: "todo done 1 2\ntodo d 5",
 	Args:    cobra.MinimumNArgs(1),
 	Aliases: []string{"d"},
 	Run: func(cmd *cobra.Command, args []string) {

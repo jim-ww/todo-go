@@ -8,6 +8,7 @@ import (
 var undoneCmd = &cobra.Command{
 	Use:     "undone task...",
 	Short:   "Marks task/s with selected id's as 'undone'",
+	Example: "todo undone 1 2\ntodo u 3",
 	Args:    cobra.MinimumNArgs(1),
 	Aliases: []string{"u"},
 	Run: func(cmd *cobra.Command, args []string) {
