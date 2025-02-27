@@ -48,7 +48,7 @@ func (t *Task) CSV() []string {
 }
 
 func ReadTasksCSV(filepath string) (tasks []*Task) {
-	file, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0666)
+	file, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		log.Fatalf("couldn't open path for writing: %s: %v", filepath, err)
 	}
@@ -56,7 +56,7 @@ func ReadTasksCSV(filepath string) (tasks []*Task) {
 
 	records, err := csv.NewReader(file).ReadAll()
 	if err != nil {
-		log.Fatalf("couldn't decode/read csv tasks: %v", err)
+		log.Fatal("couldn't decode/read csv tasks:", err)
 	}
 
 	if len(records) > 1 {
@@ -80,7 +80,7 @@ func WriteTasksCSV(filepath string) {
 	defer w.Flush()
 	if info, _ := file.Stat(); info.Size() == 0 {
 		if err := w.Write([]string{"name", "completed", "date"}); err != nil {
-			log.Fatalf("failed to write header: %v", err)
+			log.Fatal("failed to write header:", err)
 		}
 	}
 	for _, task := range Tasks {

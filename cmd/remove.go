@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"slices"
+
 	"github.com/jim-ww/todo-go/task"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +16,7 @@ var removeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		for i, arg := range args {
 			id := extractAndCheckArgID(arg, i)
-			task.Tasks = append(task.Tasks[:id-1], task.Tasks[id:]...)
+			task.Tasks = slices.Delete(task.Tasks, id-1, id)
 		}
 		writeChanges()
 	},

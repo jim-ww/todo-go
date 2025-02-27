@@ -8,8 +8,8 @@ import (
 var listCmd = &cobra.Command{
 	Use:     "list",
 	Short:   "Lists all tasks",
-	Aliases: []string{"l"},
 	Example: "todo list",
+	Aliases: []string{"l"},
 	Run: func(cmd *cobra.Command, args []string) {
 		task.PrintTasks()
 	},
